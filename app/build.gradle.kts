@@ -23,8 +23,35 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            // Setup for GitHub Actions (Env vars) or Local (Properties)
+            val keystoreFile = file("keystore.jks") // Will be created by CI
+            
+            if (System.getenv("ANDROID_KEYSTORE_BASE64") != null) {
+                // CI Environment
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEY_STORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                // Local Environment Fallback (if needed, reading from key.properties)
+                val keyPropsFile = rootProject.file("key.properties")
+                if (keyPropsFile.exists()) {
+                    val p = java.util.Properties()
+                    p.load(java.io.FileInputStream(keyPropsFile))
+                    storeFile = rootProject.file("app/keystore/keystore")
+                    storePassword = p.getProperty("storePassword")
+                    keyAlias = p.getProperty("keyAlias")
+                    keyPassword = p.getProperty("keyPassword")
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
