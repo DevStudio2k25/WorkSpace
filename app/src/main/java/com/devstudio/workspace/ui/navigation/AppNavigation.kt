@@ -206,11 +206,9 @@ fun AppNavigation(
             val context = androidx.compose.ui.platform.LocalContext.current
             
             VaultScreen(
-                onAddItem = {
-                    navController.navigate(Screen.VaultItemEditor.createRoute())
-                },
                 onItemClick = { item ->
-                    navController.navigate(Screen.VaultItemEditor.createRoute(item.id))
+                    // For images, we might want a different viewer or unhide dialog
+                    // For now keeping it simple as items are handled in the screen
                 },
                 onLockVault = {
                     navController.navigate(Screen.NotesList.route) {
@@ -221,15 +219,6 @@ fun AppNavigation(
                 },
                 onVaultSettings = {
                     navController.navigate(Screen.VaultSettings.route)
-                },
-                onImagePicked = { uri ->
-                    // TODO: Handle image encryption and storage
-                    // For now, just show a toast
-                    android.widget.Toast.makeText(
-                        context,
-                        "Image selected! Will be encrypted and hidden.",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
                 }
             )
         }

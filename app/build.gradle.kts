@@ -100,12 +100,16 @@ dependencies {
     // Biometric
 
     implementation(libs.androidx.biometric)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Gson
     implementation(libs.gson)
     
     // Lottie for animations
     implementation("com.airbnb.android:lottie-compose:6.1.0")
+    
+    // Coil for images
+    implementation("io.coil-kt:coil-compose:2.4.0")
 
     // Testing
     testImplementation(libs.junit)

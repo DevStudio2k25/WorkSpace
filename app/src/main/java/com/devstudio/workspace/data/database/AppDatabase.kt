@@ -14,13 +14,14 @@ import com.devstudio.workspace.data.model.Note
  * This is what everyone sees
  */
 @Database(
-    entities = [Note::class, Document::class],
-    version = 1,
+    entities = [Note::class, Document::class, com.devstudio.workspace.data.model.VaultItem::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun documentDao(): DocumentDao
+    abstract fun vaultItemDao(): com.devstudio.workspace.data.dao.VaultItemDao
     
     companion object {
         @Volatile

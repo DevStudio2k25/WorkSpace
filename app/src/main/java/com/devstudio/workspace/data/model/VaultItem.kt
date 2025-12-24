@@ -13,11 +13,12 @@ data class VaultItem(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val title: String,
-    val content: String, // Encrypted content
+    val content: String, // Encrypted content or path explanation
     val itemType: VaultItemType,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val filePath: String? = null, // For encrypted files
+    val encryptedFilePath: String? = null,
+    val originalFileName: String? = null,
     val fileSize: Long? = null,
     val thumbnailPath: String? = null,
     val metadata: String? = null // JSON metadata
