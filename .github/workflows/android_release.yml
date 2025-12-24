@@ -49,10 +49,7 @@ jobs:
       with:
         tag_name: ${{ steps.tag_version.outputs.tag }}
         name: Release ${{ steps.tag_version.outputs.tag }}
-        body: |
-          🚀 Automated Release Build
-          - Branch: ${{ github.ref_name }}
-          - Commit: ${{ github.sha }}
+        body_path: release_notes.md
         files: |
           app/build/outputs/apk/release/app-release.apk
         draft: false

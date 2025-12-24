@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -38,8 +41,8 @@ android {
                 // Local Environment Fallback (if needed, reading from key.properties)
                 val keyPropsFile = rootProject.file("key.properties")
                 if (keyPropsFile.exists()) {
-                    val p = java.util.Properties()
-                    p.load(java.io.FileInputStream(keyPropsFile))
+                    val p = Properties()
+                    p.load(FileInputStream(keyPropsFile))
                     storeFile = rootProject.file("app/keystore/keystore")
                     storePassword = p.getProperty("storePassword")
                     keyAlias = p.getProperty("keyAlias")
