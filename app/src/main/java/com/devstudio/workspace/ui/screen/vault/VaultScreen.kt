@@ -33,7 +33,7 @@ fun VaultScreen(
     var currentFolder by rememberSaveable { mutableStateOf<VaultItemType?>(null) }
     var selectedItems by remember { mutableStateOf<Set<VaultItem>>(emptySet()) }
     val isSelectionMode = remember(selectedItems) { selectedItems.isNotEmpty() }
-    var isMasonryMode by remember { mutableStateOf(true) }
+    var isMasonryMode by remember { mutableStateOf(false) }
 
     // Collect vault items from ViewModel
     val allVaultItems by viewModel.vaultItems.collectAsState()
@@ -141,6 +141,12 @@ fun VaultScreen(
                 },
                 actions = {
                     if (isSelectionMode) {
+                        // Select All button
+                        IconButton(onClick = {
+                            selectedItems = currentItems.toSet()
+                        }) {
+                            Icon(Icons.Default.SelectAll, "Select All", tint = MaterialTheme.colorScheme.primary)
+                        }
                         IconButton(onClick = {
                             // Bulk Unhide
                             var successCount = 0
