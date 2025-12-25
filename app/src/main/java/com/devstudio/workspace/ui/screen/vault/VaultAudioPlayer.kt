@@ -26,6 +26,9 @@ import com.devstudio.workspace.ui.viewmodel.VaultViewModel
 import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -188,7 +191,7 @@ fun VaultAudioPlayer(
                 ) {
                     Spacer(Modifier.height(32.dp))
                     
-                    // Album Art Placeholder
+                    // Album Art
                     Surface(
                         modifier = Modifier
                             .size(280.dp)
@@ -197,12 +200,35 @@ fun VaultAudioPlayer(
                         shadowElevation = 8.dp
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.MusicNote,
-                                contentDescription = null,
-                                modifier = Modifier.size(120.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.3f)
-                            )
+                            // Load album art if available
+                            val albumArtBitmap = remember(currentVaultItem.thumbnailPath) {
+                                currentVaultItem.thumbnailPath?.let { path ->
+                                    try {
+                                        val file = java.io.File(path)
+                                        if (file.exists()) {
+                                            android.graphics.BitmapFactory.decodeFile(path)
+                                        } else null
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
+                            }
+                            
+                            if (albumArtBitmap != null) {
+                                androidx.compose.foundation.Image(
+                                    bitmap = albumArtBitmap.asImageBitmap(),
+                                    contentDescription = "Album Art",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(120.dp),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.3f)
+                                )
+                            }
                         }
                     }
                     

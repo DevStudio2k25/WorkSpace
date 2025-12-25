@@ -212,11 +212,17 @@ fun AppNavigation(
             VaultScreen(
                 viewModel = vaultViewModel,
                 onItemClick = { item ->
-                    if (item.itemType == com.devstudio.workspace.data.model.VaultItemType.VIDEO) {
-                         navController.navigate(Screen.VaultVideoPlayer.createRoute(item.id))
-                    } else {
-                        // Navigate to Full Screen Image Viewer
-                        navController.navigate(Screen.VaultImageViewer.createRoute(item.id))
+                    when (item.itemType) {
+                        com.devstudio.workspace.data.model.VaultItemType.VIDEO -> {
+                            navController.navigate(Screen.VaultVideoPlayer.createRoute(item.id))
+                        }
+                        com.devstudio.workspace.data.model.VaultItemType.AUDIO -> {
+                            navController.navigate(Screen.VaultAudioPlayer.createRoute(item.id))
+                        }
+                        else -> {
+                            // Navigate to Full Screen Image Viewer
+                            navController.navigate(Screen.VaultImageViewer.createRoute(item.id))
+                        }
                     }
                 },
                 onLockVault = {
@@ -252,6 +258,24 @@ fun AppNavigation(
 
             if (item != null) {
                 com.devstudio.workspace.ui.screen.vault.VaultVideoPlayer(
+                    viewModel = vaultViewModel,
+                    item = item,
+                    onBack = { navController.popBackStack() }
+                )
+            } else {
+                // Handle error
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            }
+        }
+        
+        // Vault Audio Player
+        composable(Screen.VaultAudioPlayer.route) { backStackEntry ->
+            val itemIdString = backStackEntry.arguments?.getString("itemId")
+            val itemId = itemIdString?.toLongOrNull() ?: 0L
+            val item = vaultViewModel.vaultItems.collectAsState().value.find { it.id == itemId }
+
+            if (item != null) {
+                com.devstudio.workspace.ui.screen.vault.VaultAudioPlayer(
                     viewModel = vaultViewModel,
                     item = item,
                     onBack = { navController.popBackStack() }

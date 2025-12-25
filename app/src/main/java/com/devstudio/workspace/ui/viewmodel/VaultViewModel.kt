@@ -395,18 +395,35 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                         val encryptedFileName = "${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.enc"
                         val vaultFile = File(vaultDir, encryptedFileName)
                         
-                        // 2. Generate Audio Thumbnail (waveform placeholder)
+                        // 2. Extract Album Art as Thumbnail
                         var thumbnailPath: String? = null
                         try {
-                            // For audio, we'll use a music note icon as thumbnail
-                            // In future, could generate waveform visualization
                             val thumbDir = File(context.filesDir, "thumbnails")
                             if (!thumbDir.exists()) thumbDir.mkdirs()
                             
-                            // Create a simple colored thumbnail for audio
-                            val thumbFile = File(thumbDir, "thumb_audio_${System.currentTimeMillis()}.jpg")
-                            // We'll skip actual thumbnail generation for audio for now
-                            // thumbnailPath will be null, UI will show music icon
+                            // Extract album art from audio file
+                            val retriever = android.media.MediaMetadataRetriever()
+                            try {
+                                retriever.setDataSource(context, uri)
+                                val albumArt = retriever.embeddedPicture
+                                
+                                if (albumArt != null) {
+                                    // Decode and save album art
+                                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(albumArt, 0, albumArt.size)
+                                    if (bitmap != null) {
+                                        val thumbFile = File(thumbDir, "thumb_audio_${System.currentTimeMillis()}.jpg")
+                                        FileOutputStream(thumbFile).use { out ->
+                                            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+                                        }
+                                        thumbnailPath = thumbFile.absolutePath
+                                        bitmap.recycle()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            } finally {
+                                retriever.release()
+                            }
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }

@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import com.devstudio.workspace.data.model.VaultItem
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 
 @Composable
 fun VaultAudioGallery(
@@ -93,7 +96,7 @@ fun VaultAudioItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Audio Icon / Selection Indicator
+            // Album Art / Selection Indicator
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -106,20 +109,52 @@ fun VaultAudioItem(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (isSelected) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = "Selected",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(28.dp)
-                    )
+                when {
+                    isSelected -> {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Selected",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    item.thumbnailPath != null -> {
+                        // Load and display album art
+                        val bitmap = remember(item.thumbnailPath) {
+                            try {
+                                val file = java.io.File(item.thumbnailPath!!)
+                                if (file.exists()) {
+                                    android.graphics.BitmapFactory.decodeFile(item.thumbnailPath)
+                                } else null
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+                        
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = "Album Art",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                    else -> {
+                        Icon(
+                            Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
             }
 
@@ -135,12 +170,35 @@ fun VaultAudioItem(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = formatFileSize(item.fileSize ?: 0),
+                    text = "Encrypted Audio",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = formatFileSize(item.fileSize ?: 0),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = formatDate(item.createdAt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
             }
 
             // Play/Selection Icon
@@ -177,6 +235,22 @@ fun VaultAudioItem(
                     )
                 }
             }
+        }
+    }
+}
+
+private fun formatDate(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    val days = diff / (1000 * 60 * 60 * 24)
+    
+    return when {
+        days == 0L -> "Today"
+        days == 1L -> "Yesterday"
+        days < 7 -> "$days days ago"
+        else -> {
+            val sdf = java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault())
+            sdf.format(java.util.Date(timestamp))
         }
     }
 }
