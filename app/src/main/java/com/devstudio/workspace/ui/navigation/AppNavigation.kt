@@ -11,6 +11,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.devstudio.workspace.ui.screen.*
+import com.devstudio.workspace.ui.screen.vault.VaultScreen
 import com.devstudio.workspace.ui.theme.AppTheme
 import com.devstudio.workspace.ui.viewmodel.NoteViewModel
 import kotlinx.coroutines.flow.first
@@ -24,6 +25,9 @@ fun AppNavigation(
     noteViewModel: NoteViewModel,
     startDestination: String = Screen.Splash.route
 ) {
+    // Shared ViewModels
+    val vaultViewModel: com.devstudio.workspace.ui.viewmodel.VaultViewModel = viewModel()
+
     NavHost(
         navController = navController,
         startDestination = startDestination
@@ -206,9 +210,10 @@ fun AppNavigation(
             val context = androidx.compose.ui.platform.LocalContext.current
             
             VaultScreen(
+                viewModel = vaultViewModel,
                 onItemClick = { item ->
-                    // For images, we might want a different viewer or unhide dialog
-                    // For now keeping it simple as items are handled in the screen
+                    // Navigate to Full Screen Image Viewer
+                    navController.navigate(Screen.VaultImageViewer.createRoute(item.id))
                 },
                 onLockVault = {
                     navController.navigate(Screen.NotesList.route) {
@@ -220,6 +225,18 @@ fun AppNavigation(
                 onVaultSettings = {
                     navController.navigate(Screen.VaultSettings.route)
                 }
+            )
+        }
+
+        // Vault Image Viewer
+        composable(Screen.VaultImageViewer.route) { backStackEntry ->
+            val itemIdString = backStackEntry.arguments?.getString("itemId")
+            val itemId = itemIdString?.toLongOrNull() ?: 0L
+
+            com.devstudio.workspace.ui.screen.vault.VaultImageViewer(
+                viewModel = vaultViewModel,
+                initialItemId = itemId,
+                onBack = { navController.popBackStack() }
             )
         }
         
