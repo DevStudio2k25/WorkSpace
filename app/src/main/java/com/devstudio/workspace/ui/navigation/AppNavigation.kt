@@ -11,6 +11,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.devstudio.workspace.ui.screen.*
+import com.devstudio.workspace.ui.screen.noteeditor.AdvancedNoteEditorScreen
 import com.devstudio.workspace.ui.screen.vault.VaultScreen
 import com.devstudio.workspace.ui.screen.vault.PinLockScreen
 import com.devstudio.workspace.ui.screen.vault.VaultSettingsScreen
@@ -70,7 +71,7 @@ fun AppNavigation(
             val noteIdString = backStackEntry.arguments?.getString("noteId")
             val noteId = noteIdString?.toLongOrNull()
             
-            NoteEditorScreen(
+            AdvancedNoteEditorScreen(
                 noteId = noteId,
                 viewModel = noteViewModel,
                 onBack = {
@@ -124,7 +125,7 @@ fun AppNavigation(
                             com.devstudio.workspace.util.BiometricUtil.isBiometricAvailable(it)
                         } ?: false
                         
-                        if (biometricEnabled && isBiometricAvailable && activity != null) {
+                        if (biometricEnabled && isBiometricAvailable) {
                             // Show biometric prompt
                             com.devstudio.workspace.util.BiometricUtil.showBiometricPrompt(
                                 activity = activity,
@@ -180,6 +181,7 @@ fun AppNavigation(
                                         showWrongPinError = true
                                         
                                         // Vibrate
+                                        @Suppress("DEPRECATION")
                                         val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
                                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                                             vibrator.vibrate(android.os.VibrationEffect.createOneShot(500, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
@@ -314,8 +316,8 @@ fun AppNavigation(
             val itemIdString = backStackEntry.arguments?.getString("itemId")
             val itemId = itemIdString?.toLongOrNull()
             
-            // Temporary: Using NoteEditor for vault items
-            NoteEditorScreen(
+            // Temporary: Using AdvancedNoteEditor for vault items
+            AdvancedNoteEditorScreen(
                 noteId = itemId,
                 viewModel = noteViewModel,
                 onBack = {
@@ -357,11 +359,12 @@ fun AppNavigation(
         composable("pin_setup") {
             val context = androidx.compose.ui.platform.LocalContext.current
             val securePrefs = remember { com.devstudio.workspace.util.SecurePreferences(context) }
+            val scope = rememberCoroutineScope()
             
             PinLockScreen(
                 isSetup = true,
                 onPinComplete = { newPin ->
-                    kotlinx.coroutines.GlobalScope.launch {
+                    scope.launch {
                         securePrefs.setVaultPin(newPin)
                         navController.popBackStack()
                     }

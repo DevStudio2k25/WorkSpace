@@ -18,6 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.devstudio.workspace.ui.theme.AppTheme
 import com.devstudio.workspace.ui.theme.getDisplayName
+import com.devstudio.workspace.util.SecurePreferences
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +33,27 @@ fun SettingsScreen(
     var notificationsEnabled by remember { mutableStateOf(true) }
     var autoSave by remember { mutableStateOf(true) }
     var defaultCategory by remember { mutableStateOf("General") }
+    
+    // AI Settings State
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val securePrefs = remember { SecurePreferences(context) }
+    val scope = rememberCoroutineScope()
+    
+    var aiEnabled by remember { mutableStateOf(false) }
+    var aiApiKey by remember { mutableStateOf("") }
+    var aiModel by remember { mutableStateOf("") }
+    var showAiConfigDialog by remember { mutableStateOf(false) }
+    
+    // Load AI Settings
+    LaunchedEffect(Unit) {
+        securePrefs.aiEnabled.collect { aiEnabled = it }
+    }
+    LaunchedEffect(Unit) {
+        securePrefs.aiApiKey.collect { aiApiKey = it }
+    }
+    LaunchedEffect(Unit) {
+        securePrefs.aiModel.collect { aiModel = it }
+    }
     
     val categories = listOf("General", "Personal", "Work", "Ideas", "Shopping", "Study", "Health", "Other")
     
@@ -129,6 +152,52 @@ fun SettingsScreen(
                     subtitle = defaultCategory,
                     onClick = { showCategoryDialog = true }
                 )
+            }
+            
+            // AI Assistant Section
+            item {
+                SectionHeader(
+                    title = "AI Assistant",
+                    icon = Icons.Default.Face
+                )
+            }
+            
+            item {
+                ModernSettingCard(
+                    icon = Icons.Default.Face,
+                    iconBackground = Color(0xFFF3E5F5), // Purple-ish
+                    iconTint = Color(0xFF7B1FA2),
+                    title = "Enable AI Assistant",
+                    subtitle = if (aiEnabled) "AI features enabled" else "Disabled",
+                    trailing = {
+                        Switch(
+                            checked = aiEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled && (aiApiKey.isBlank() || aiModel.isBlank())) {
+                                    showAiConfigDialog = true
+                                } else {
+                                    aiEnabled = enabled
+                                    scope.launch {
+                                        securePrefs.setAiEnabled(enabled)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                )
+            }
+            
+            if (aiEnabled || aiApiKey.isNotBlank()) {
+                item {
+                    ModernSettingCard(
+                        icon = Icons.Default.Settings,
+                        iconBackground = Color(0xFFE0F7FA), // Cyan-ish
+                        iconTint = Color(0xFF0097A7),
+                        title = "AI Configuration",
+                        subtitle = "OpenRouter API Key & Model",
+                        onClick = { showAiConfigDialog = true }
+                    )
+                }
             }
             
             // About
@@ -260,6 +329,93 @@ fun SettingsScreen(
                 confirmButton = {
                     TextButton(onClick = { showCategoryDialog = false }) {
                         Text("Close")
+                    }
+                }
+            )
+        }
+        
+        // AI Configuration Dialog
+        if (showAiConfigDialog) {
+            var inputKey by remember { mutableStateOf(aiApiKey) }
+            var inputModel by remember { mutableStateOf(if (aiModel.isBlank()) "mistralai/mistral-7b-instruct:free" else aiModel) }
+            var error by remember { mutableStateOf("") }
+            
+            AlertDialog(
+                onDismissRequest = { showAiConfigDialog = false },
+                icon = {
+                    Icon(
+                        Icons.Default.Face,
+                        null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                title = { 
+                    Text(
+                        "Configure AI",
+                        fontWeight = FontWeight.Bold
+                    ) 
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            "Enter your OpenRouter API Key and Model. This is required to use AI features.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        OutlinedTextField(
+                            value = inputKey,
+                            onValueChange = { inputKey = it },
+                            label = { Text("OpenRouter API Key") },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        OutlinedTextField(
+                            value = inputModel,
+                            onValueChange = { inputModel = it },
+                            label = { Text("Model Name") },
+                            placeholder = { Text("e.g. google/gemini-pro") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        if (error.isNotEmpty()) {
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (inputKey.isBlank() || inputModel.isBlank()) {
+                                error = "Both fields are required."
+                            } else {
+                                scope.launch {
+                                    securePrefs.setAiConfig(inputKey.trim(), inputModel.trim())
+                                    // If setting up for first time, auto-enable
+                                    if (!aiEnabled) {
+                                        securePrefs.setAiEnabled(true)
+                                        aiEnabled = true
+                                    }
+                                }
+                                showAiConfigDialog = false
+                            }
+                        }
+                    ) {
+                        Text("Save & Enable")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAiConfigDialog = false }) {
+                        Text("Cancel")
                     }
                 }
             )

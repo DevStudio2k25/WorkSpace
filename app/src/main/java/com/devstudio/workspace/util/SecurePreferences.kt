@@ -28,6 +28,12 @@ class SecurePreferences(private val context: Context) {
         private val USE_BIOMETRIC = booleanPreferencesKey("use_biometric")
         private val VAULT_KEYWORD = stringPreferencesKey("vault_keyword")
         private val VAULT_PIN = stringPreferencesKey("vault_pin")
+        
+        // AI Settings
+        private val AI_ENABLED = booleanPreferencesKey("ai_enabled")
+        private val AI_API_KEY = stringPreferencesKey("ai_api_key")
+        private val AI_MODEL = stringPreferencesKey("ai_model")
+        private val AI_LANGUAGE = stringPreferencesKey("ai_language")
     }
     
     // Check if vault is initialized
@@ -137,6 +143,45 @@ class SecurePreferences(private val context: Context) {
             prefs.remove(USE_BIOMETRIC)
             prefs.remove(VAULT_KEYWORD)
             prefs.remove(VAULT_PIN)
+            prefs.remove(VAULT_PIN)
+        }
+    }
+    
+    // AI Settings Getters
+    val aiEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[AI_ENABLED] ?: false
+    }
+    
+    val aiApiKey: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[AI_API_KEY] ?: ""
+    }
+    
+    val aiModel: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[AI_MODEL] ?: ""
+    }
+    
+    val aiLanguage: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[AI_LANGUAGE] ?: "English"
+    }
+    
+    // Save AI Settings
+    suspend fun setAiEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[AI_ENABLED] = enabled
+        }
+    }
+    
+    suspend fun setAiConfig(apiKey: String, model: String, language: String = "English") {
+        context.dataStore.edit { prefs ->
+            prefs[AI_API_KEY] = apiKey
+            prefs[AI_MODEL] = model
+            prefs[AI_LANGUAGE] = language
+        }
+    }
+    
+    suspend fun setAiLanguage(language: String) {
+        context.dataStore.edit { prefs ->
+            prefs[AI_LANGUAGE] = language
         }
     }
 }

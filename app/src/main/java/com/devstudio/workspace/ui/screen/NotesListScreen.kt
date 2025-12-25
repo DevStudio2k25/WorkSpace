@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -429,7 +431,7 @@ fun SearchBar(
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
-                    Icons.Default.ArrowBack,
+                    Icons.AutoMirrored.Filled.ArrowBack,
                     "Close search",
                     tint = MaterialTheme.colorScheme.onSurface
                 )
@@ -465,7 +467,7 @@ fun EmptyState(modifier: Modifier = Modifier) {
             modifier = Modifier.size(120.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Note,
+                imageVector = Icons.AutoMirrored.Filled.Note,
                 contentDescription = null,
                 modifier = Modifier.padding(30.dp),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer
