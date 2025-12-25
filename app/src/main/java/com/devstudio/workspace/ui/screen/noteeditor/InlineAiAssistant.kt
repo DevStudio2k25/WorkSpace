@@ -241,7 +241,7 @@ fun InlineAiAssistant(
                 typingIndex = 0
                 
                 while (typingIndex < typingText.length) {
-                    delay(15)
+                    delay(5) // Fast typing speed
                     typingIndex++
                     
                     val textToInsert = typingText.substring(0, typingIndex)
@@ -301,7 +301,7 @@ fun InlineAiAssistant(
                         var charIndex = 0
                         
                         while (charIndex < lineToType.length) {
-                            delay(15)
+                            delay(5) // Fast typing speed
                             charIndex++
                             
                             val partialLine = lineToType.substring(0, charIndex)

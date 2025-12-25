@@ -2,6 +2,7 @@ package com.devstudio.workspace.ui.screen.noteeditor
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
@@ -16,7 +17,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 
 @Composable
 fun NoteContentArea(
@@ -25,50 +25,84 @@ fun NoteContentArea(
     highlightedLines: List<Int> = emptyList(),
     onScrollToBottom: () -> Unit = {}
 ) {
-    val scrollState = rememberScrollState()
-    val scope = rememberCoroutineScope()
+    val verticalScrollState = rememberScrollState()
+    val horizontalScrollState = rememberScrollState()
     
-    // Auto-scroll when content changes
-    LaunchedEffect(content.length) {
-        if (scrollState.maxValue > 0) {
-            scope.launch {
-                scrollState.animateScrollTo(scrollState.maxValue)
-            }
-        }
+    // Calculate line count dynamically
+    val lineCount = remember(content) {
+        if (content.isEmpty()) 1 else content.count { it == '\n' } + 1
     }
-    
-    val lines = remember(content) { content.lines() }
-    var editingLineIndex by remember { mutableStateOf<Int?>(null) }
     
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
     ) {
-        // Line numbers column (VS Code style)
-        Column(
+        // Line numbers column - synced with content scroll
+        Box(
             modifier = Modifier
                 .width(50.dp)
                 .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                .verticalScroll(scrollState)
-                .padding(vertical = 12.dp, horizontal = 8.dp),
-            horizontalAlignment = Alignment.End
         ) {
-            lines.forEachIndexed { index, _ ->
-                val isHighlighted = highlightedLines.contains(index)
-                Text(
-                    text = "${index + 1}",
-                    style = TextStyle(
-                        fontSize = 14.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (isHighlighted) 
-                            Color(0xFF4CAF50) 
-                        else 
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    ),
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
+            // Background for line numbers
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            )
+            
+            // Horizontal lines under numbers (synced)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(verticalScrollState, enabled = false)
+                    .padding(top = 12.dp)
+            ) {
+                repeat(lineCount) { index ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                    ) {
+                        // Bottom border for each line
+                        Divider(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+            }
+            
+            // Line numbers on top
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(verticalScrollState, enabled = false)
+                    .padding(top = 12.dp, start = 8.dp, end = 8.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                repeat(lineCount) { index ->
+                    val isHighlighted = highlightedLines.contains(index)
+                    Box(
+                        modifier = Modifier.height(24.dp),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            style = TextStyle(
+                                fontSize = 14.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isHighlighted) 
+                                    Color(0xFF4CAF50) 
+                                else 
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        )
+                    }
+                }
             }
         }
         
@@ -80,87 +114,106 @@ fun NoteContentArea(
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
         )
         
-        // Content area - line by line editing
-        Column(
+        // Content area - multi-line text field with horizontal scroll
+        Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .verticalScroll(scrollState)
-                .padding(start = 12.dp, end = 16.dp, top = 12.dp, bottom = 100.dp)
         ) {
-            if (lines.isEmpty() || (lines.size == 1 && lines[0].isEmpty())) {
-                // Empty state
-                Text(
-                    text = "Start writing...",
-                    style = TextStyle(
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    ),
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-            } else {
-                lines.forEachIndexed { index, line ->
-                    val isHighlighted = highlightedLines.contains(index)
-                    val isEditing = editingLineIndex == index
-                    
+            // Horizontal lines background (notebook style)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(verticalScrollState, enabled = false)
+                    .padding(start = 12.dp, top = 12.dp)
+            ) {
+                repeat(lineCount) { index ->
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                when {
-                                    isHighlighted -> Color(0xFF4CAF50).copy(alpha = 0.15f)
-                                    isEditing -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
-                                    else -> Color.Transparent
-                                }
-                            )
-                            .border(
-                                width = if (isHighlighted) 1.dp else 0.dp,
-                                color = if (isHighlighted) Color(0xFF4CAF50).copy(alpha = 0.3f) else Color.Transparent
-                            )
-                            .padding(vertical = 4.dp, horizontal = 8.dp)
+                            .height(24.dp)
                     ) {
-                        BasicTextField(
-                            value = line,
-                            onValueChange = { newLine ->
-                                val newLines = lines.toMutableList()
-                                newLines[index] = newLine
-                                onContentChange(newLines.joinToString("\n"))
-                            },
-                            textStyle = TextStyle(
-                                fontSize = 16.sp,
-                                lineHeight = 24.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontFamily = FontFamily.Default
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        // Bottom border for each line (notebook line)
+                        Divider(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .defaultMinSize(minHeight = 24.dp),
-                            decorationBox = { innerTextField ->
-                                Box(
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    if (line.isEmpty()) {
-                                        Text(
-                                            text = " ",
-                                            style = TextStyle(
-                                                fontSize = 16.sp,
-                                                lineHeight = 24.sp,
-                                                color = Color.Transparent
-                                            )
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            },
-                            onTextLayout = {
-                                // Track which line is being edited
-                                editingLineIndex = index
-                            }
+                                .align(Alignment.BottomCenter),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f) // More visible
                         )
                     }
                 }
             }
+            
+            // Line highlights overlay
+            if (highlightedLines.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(verticalScrollState, enabled = false)
+                        .padding(start = 12.dp, end = 16.dp, top = 12.dp)
+                ) {
+                    repeat(lineCount) { index ->
+                        val isHighlighted = highlightedLines.contains(index)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(24.dp)
+                                .background(
+                                    if (isHighlighted) 
+                                        Color(0xFF4CAF50).copy(alpha = 0.15f) 
+                                    else 
+                                        Color.Transparent
+                                )
+                                .border(
+                                    width = if (isHighlighted) 1.dp else 0.dp,
+                                    color = if (isHighlighted) 
+                                        Color(0xFF4CAF50).copy(alpha = 0.3f) 
+                                    else 
+                                        Color.Transparent
+                                )
+                        )
+                    }
+                }
+            }
+            
+            // Text field on top
+            BasicTextField(
+                value = content,
+                onValueChange = onContentChange,
+                textStyle = TextStyle(
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp, // Match line height
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontFamily = FontFamily.Default,
+                    baselineShift = androidx.compose.ui.text.style.BaselineShift(0.2f) // Shift text down to sit on line
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(verticalScrollState)
+                    .horizontalScroll(horizontalScrollState)
+                    .padding(start = 12.dp, end = 16.dp, top = 16.dp, bottom = 100.dp), // Adjusted top padding
+                decorationBox = { innerTextField ->
+                    Box(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (content.isEmpty()) {
+                            Text(
+                                text = "Start writing...",
+                                style = TextStyle(
+                                    fontSize = 16.sp,
+                                    lineHeight = 24.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            )
+                        }
+                        innerTextField()
+                    }
+                },
+                maxLines = Int.MAX_VALUE,
+                singleLine = false
+            )
         }
     }
 }
