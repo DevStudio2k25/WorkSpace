@@ -1,10 +1,6 @@
 package com.devstudio.workspace.ui.screen.vault
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
@@ -24,15 +20,26 @@ fun VaultFolderGrid(
         Triple(VaultItemType.DOCUMENT, Icons.Default.Description, "Documents")
     )
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = modifier
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(folders) { (type, icon, label) ->
-            FolderCard(type, icon, label, onClick = { onFolderClick(type) })
+        val chunkedFolders = folders.chunked(2)
+        chunkedFolders.forEach { rowFolders ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                rowFolders.forEach { (type, icon, label) ->
+                    Box(modifier = Modifier.weight(1f)) {
+                        FolderCard(type, icon, label, onClick = { onFolderClick(type) })
+                    }
+                }
+                // If row has only 1 item, add spacer to keep alignment
+                if (rowFolders.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }

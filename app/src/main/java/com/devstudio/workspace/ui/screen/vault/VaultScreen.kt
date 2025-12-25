@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -260,13 +262,22 @@ fun VaultScreen(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             if (currentFolder == null) {
-                // Folder Grid View
-                VaultFolderGrid(
-                    modifier = Modifier.fillMaxSize(),
-                    onFolderClick = { type ->
-                        currentFolder = type
-                    }
-                )
+                // Folder Grid View with Info Section
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    VaultFolderGrid(
+                        modifier = Modifier.fillMaxWidth(),
+                        onFolderClick = { type ->
+                            currentFolder = type
+                        }
+                    )
+                    
+                    // Information Section
+                    VaultInfoSection()
+                }
             } else {
                 // Items Gallery View (Currently only optimized for Images)
                 if (currentItems.isEmpty()) {
