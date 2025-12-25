@@ -12,6 +12,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.devstudio.workspace.ui.screen.*
 import com.devstudio.workspace.ui.screen.vault.VaultScreen
+import com.devstudio.workspace.ui.screen.vault.PinLockScreen
+import com.devstudio.workspace.ui.screen.vault.VaultSettingsScreen
 import com.devstudio.workspace.ui.theme.AppTheme
 import com.devstudio.workspace.ui.viewmodel.NoteViewModel
 import kotlinx.coroutines.flow.first

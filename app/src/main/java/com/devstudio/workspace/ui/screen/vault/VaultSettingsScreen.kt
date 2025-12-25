@@ -1,4 +1,4 @@
-package com.devstudio.workspace.ui.screen
+package com.devstudio.workspace.ui.screen.vault
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
