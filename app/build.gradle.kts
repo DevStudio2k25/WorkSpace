@@ -135,6 +135,9 @@ dependencies {
     // Gson
     implementation(libs.gson)
     
+    // Diff Utils for smart line-by-line editing
+    implementation("io.github.java-diff-utils:java-diff-utils:4.12")
+    
     // Lottie for animations
     implementation("com.airbnb.android:lottie-compose:6.1.0")
     

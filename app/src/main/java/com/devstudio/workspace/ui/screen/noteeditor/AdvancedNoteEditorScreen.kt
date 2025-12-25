@@ -30,6 +30,7 @@ fun AdvancedNoteEditorScreen(
     // UI State
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
+    var highlightedLines by remember { mutableStateOf<List<Int>>(emptyList()) }
     
     // Coroutine scope
     val scope = rememberCoroutineScope()
@@ -80,12 +81,13 @@ fun AdvancedNoteEditorScreen(
                     .padding(padding)
                     .fillMaxSize()
             ) {
-                // Main Content Area
+                // Main Content Area with line numbers
                 NoteContentArea(
                     content = content,
                     onContentChange = { newContent ->
                         content = newContent
-                    }
+                    },
+                    highlightedLines = highlightedLines
                 )
                 
                 // Inline AI Assistant (permanent at bottom)
@@ -107,6 +109,9 @@ fun AdvancedNoteEditorScreen(
                         },
                         onScrollToBottom = {
                             // Scroll will happen automatically in NoteContentArea
+                        },
+                        onHighlightLines = { lines ->
+                            highlightedLines = lines
                         }
                     )
                 }

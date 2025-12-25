@@ -21,6 +21,8 @@ import com.devstudio.workspace.ui.viewmodel.NoteViewModel
 import com.devstudio.workspace.util.SecurePreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.github.difflib.DiffUtils
+import com.github.difflib.patch.*
 
 // Data class for diff segments
 data class DiffSegment(
@@ -38,6 +40,7 @@ fun InlineAiAssistant(
     onContentUpdate: (newContent: String) -> Unit,
     onTitleUpdate: (newTitle: String) -> Unit,
     onScrollToBottom: () -> Unit = {},
+    onHighlightLines: (List<Int>) -> Unit = {}, // New: highlight changed lines
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -57,7 +60,20 @@ fun InlineAiAssistant(
     var userInput by remember { mutableStateOf("") }
     var lastQuery by remember { mutableStateOf("") }
     
-    // Detect if query is for replacement or addition
+    // Add line numbers to content for AI
+    fun addLineNumbers(content: String): String {
+        if (content.isBlank()) return content
+        return content.lines().mapIndexed { index, line ->
+            "[${index + 1}] $line"
+        }.joinToString("\n")
+    }
+    
+    // Remove line numbers from AI response
+    fun removeLineNumbers(content: String): String {
+        return content.lines().map { line ->
+            line.replace(Regex("^\\[\\d+\\]\\s*"), "")
+        }.joinToString("\n")
+    }
     fun shouldReplaceContent(query: String): Boolean {
         val lowerQuery = query.lowercase()
         
@@ -87,29 +103,96 @@ fun InlineAiAssistant(
         return currentContent.isNotBlank()
     }
     
-    // Smart diff-based content merge
-    fun smartMergeContent(oldContent: String, newContent: String): List<DiffSegment> {
-        val oldLines = oldContent.lines()
+    // Smart Myers Diff-based content merge
+    fun applyMyersDiff(oldContent: String, newContent: String): String {
+        val originalLines = oldContent.lines()
         val newLines = newContent.lines()
+        
+        // Generate Myers diff patch
+        val patch = DiffUtils.diff(originalLines, newLines)
+        
+        // Apply patch to get final content
+        val finalLines = originalLines.toMutableList()
+        
+        // Process deltas in reverse to avoid index shifting issues
+        patch.deltas.reversed().forEach { delta ->
+            when (delta) {
+                is InsertDelta -> {
+                    // Insert new lines
+                    finalLines.addAll(
+                        delta.source.position,
+                        delta.target.lines
+                    )
+                }
+                is DeleteDelta -> {
+                    // Delete lines
+                    repeat(delta.source.lines.size) {
+                        if (delta.source.position < finalLines.size) {
+                            finalLines.removeAt(delta.source.position)
+                        }
+                    }
+                }
+                is ChangeDelta -> {
+                    // Replace lines
+                    repeat(delta.source.lines.size) {
+                        if (delta.source.position < finalLines.size) {
+                            finalLines.removeAt(delta.source.position)
+                        }
+                    }
+                    finalLines.addAll(
+                        delta.source.position,
+                        delta.target.lines
+                    )
+                }
+            }
+        }
+        
+        return finalLines.joinToString("\n")
+    }
+    
+    // Get line-by-line diff segments for typing animation
+    fun getTypingSegments(oldContent: String, newContent: String): List<DiffSegment> {
+        val originalLines = oldContent.lines()
+        val newLines = newContent.lines()
+        
+        val patch = DiffUtils.diff(originalLines, newLines)
         val segments = mutableListOf<DiffSegment>()
         
-        var oldIndex = 0
-        var newIndex = 0
+        var currentLine = 0
         
-        while (newIndex < newLines.size) {
-            val newLine = newLines[newIndex]
-            
-            // Check if this line exists in old content (unchanged)
-            if (oldIndex < oldLines.size && oldLines[oldIndex].trim() == newLine.trim()) {
-                // Line unchanged - keep it as is (no typing needed)
-                segments.add(DiffSegment(newLine, isUnchanged = true))
-                oldIndex++
-                newIndex++
-            } else {
-                // Line is new or modified - needs typing
-                segments.add(DiffSegment(newLine, isUnchanged = false))
-                newIndex++
+        patch.deltas.forEach { delta ->
+            // Add unchanged lines before this delta
+            while (currentLine < delta.source.position) {
+                if (currentLine < originalLines.size) {
+                    segments.add(DiffSegment(originalLines[currentLine], isUnchanged = true))
+                }
+                currentLine++
             }
+            
+            // Add changed/new lines
+            when (delta) {
+                is InsertDelta -> {
+                    delta.target.lines.forEach { line ->
+                        segments.add(DiffSegment(line, isUnchanged = false))
+                    }
+                }
+                is DeleteDelta -> {
+                    // Skip deleted lines
+                    currentLine += delta.source.lines.size
+                }
+                is ChangeDelta -> {
+                    delta.target.lines.forEach { line ->
+                        segments.add(DiffSegment(line, isUnchanged = false))
+                    }
+                    currentLine += delta.source.lines.size
+                }
+            }
+        }
+        
+        // Add remaining unchanged lines
+        while (currentLine < originalLines.size) {
+            segments.add(DiffSegment(originalLines[currentLine], isUnchanged = true))
+            currentLine++
         }
         
         return segments
@@ -119,6 +202,10 @@ fun InlineAiAssistant(
     LaunchedEffect(aiResponse) {
         if (aiResponse != null && !aiLoading && !isTypingInEditor) {
             var processedContent = aiResponse!!.trim()
+            
+            // Remove line numbers from AI response
+            processedContent = removeLineNumbers(processedContent)
+            
             var extractedTitle: String? = null
             
             // Extract title if present
@@ -174,43 +261,69 @@ fun InlineAiAssistant(
                 onScrollToBottom()
                 isTypingInEditor = false
             } else {
-                // Smart diff mode: replace with intelligent typing
+                // Myers Diff mode: smart line-by-line editing with visible unchanged content
                 isTypingInEditor = true
                 
-                val diffSegments = smartMergeContent(currentContent, processedContent)
-                val resultLines = mutableListOf<String>()
+                val typingSegments = getTypingSegments(currentContent, processedContent)
                 
-                for (segment in diffSegments) {
+                // Track which lines are being changed
+                val changedLineIndices = mutableListOf<Int>()
+                
+                // Build initial content with all unchanged lines visible
+                val unchangedLines = mutableListOf<String>()
+                typingSegments.forEachIndexed { index, segment ->
                     if (segment.isUnchanged) {
-                        // Keep unchanged line as is (instant, no typing)
-                        resultLines.add(segment.text)
-                        onContentUpdate(resultLines.joinToString("\n"))
-                        delay(50) // Small delay to show progression
+                        unchangedLines.add(segment.text)
                     } else {
-                        // Type new/modified line character by character
-                        var charIndex = 0
+                        unchangedLines.add("") // Placeholder for lines being typed
+                        changedLineIndices.add(index)
+                    }
+                }
+                
+                // Show initial state with unchanged content
+                onContentUpdate(unchangedLines.joinToString("\n"))
+                delay(100)
+                
+                // Highlight changed lines
+                onHighlightLines(changedLineIndices)
+                
+                // Now type changed lines one by one
+                var lineIndex = 0
+                val finalLines = unchangedLines.toMutableList()
+                
+                for (segment in typingSegments) {
+                    if (segment.isUnchanged) {
+                        // Already visible, just move to next
+                        lineIndex++
+                    } else {
+                        // Type this line character by character
                         val lineToType = segment.text
+                        var charIndex = 0
                         
                         while (charIndex < lineToType.length) {
                             delay(15)
                             charIndex++
                             
                             val partialLine = lineToType.substring(0, charIndex)
-                            val tempLines = resultLines.toMutableList()
-                            tempLines.add(partialLine)
+                            finalLines[lineIndex] = partialLine
                             
-                            onContentUpdate(tempLines.joinToString("\n"))
+                            onContentUpdate(finalLines.joinToString("\n"))
                             
                             if (charIndex % 10 == 0) {
                                 onScrollToBottom()
                             }
                         }
                         
-                        // Add complete line to result
-                        resultLines.add(lineToType)
-                        onContentUpdate(resultLines.joinToString("\n"))
+                        // Complete line typed
+                        finalLines[lineIndex] = lineToType
+                        onContentUpdate(finalLines.joinToString("\n"))
+                        lineIndex++
                     }
                 }
+                
+                // Keep highlight for 3 seconds after typing completes
+                delay(3000)
+                onHighlightLines(emptyList())
                 
                 onScrollToBottom()
                 isTypingInEditor = false
@@ -261,7 +374,9 @@ fun InlineAiAssistant(
                     onClick = {
                         if (userInput.isNotBlank()) {
                             lastQuery = userInput // Store query for detection
-                            viewModel.generateAiContent(userInput, currentContent)
+                            // Add line numbers to content before sending to AI
+                            val numberedContent = addLineNumbers(currentContent)
+                            viewModel.generateAiContent(userInput, numberedContent)
                             userInput = ""
                         }
                     },
