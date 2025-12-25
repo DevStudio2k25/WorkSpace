@@ -67,6 +67,17 @@ fun VaultScreen(
         }
     }
     
+    // Audio picker launcher
+    val audioPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<android.net.Uri> ->
+        if (uris.isNotEmpty()) {
+            viewModel.hideAudios(context, uris) { count ->
+                showMessage = "Hidden $count audio files successfully"
+            }
+        }
+    }
+    
     // Handle Back Press
     BackHandler(enabled = currentFolder != null || isSelectionMode) {
         if (isSelectionMode) {
@@ -192,6 +203,16 @@ fun VaultScreen(
                 ) {
                     Icon(Icons.Default.Add, "add", tint = MaterialTheme.colorScheme.onPrimary)
                 }
+            } else if (currentFolder == VaultItemType.AUDIO) {
+                 FloatingActionButton(
+                    onClick = {
+                        audioPickerLauncher.launch(arrayOf("audio/*"))
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.Add, "add", tint = MaterialTheme.colorScheme.onPrimary)
+                }
             }
         },
         snackbarHost = {
@@ -216,7 +237,7 @@ fun VaultScreen(
                 VaultFolderGrid(
                     modifier = Modifier.fillMaxSize(),
                     onFolderClick = { type ->
-                        if (type == VaultItemType.IMAGE || type == VaultItemType.VIDEO) {
+                        if (type == VaultItemType.IMAGE || type == VaultItemType.VIDEO || type == VaultItemType.AUDIO) {
                             currentFolder = type
                         } else {
                             showMessage = "Coming Soon"
@@ -250,6 +271,23 @@ fun VaultScreen(
                     )
                 } else if (currentFolder == VaultItemType.VIDEO) {
                     VaultVideoGallery(
+                        items = currentItems,
+                        onItemClick = { item ->
+                            if (isSelectionMode) {
+                                selectedItems = if (selectedItems.contains(item)) selectedItems - item else selectedItems + item
+                            } else {
+                                onItemClick(item)
+                            }
+                        },
+                        onItemLongClick = { item ->
+                             if (!isSelectionMode) {
+                                 selectedItems = selectedItems + item
+                             }
+                        },
+                        selectedItems = selectedItems
+                    )
+                } else if (currentFolder == VaultItemType.AUDIO) {
+                    VaultAudioGallery(
                         items = currentItems,
                         onItemClick = { item ->
                             if (isSelectionMode) {
