@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,7 +30,7 @@ fun VaultScreen(
 ) {
     val context = LocalContext.current
     var showMessage by remember { mutableStateOf<String?>(null) }
-    var currentFolder by remember { mutableStateOf<VaultItemType?>(null) }
+    var currentFolder by rememberSaveable { mutableStateOf<VaultItemType?>(null) }
     var selectedItems by remember { mutableStateOf<Set<VaultItem>>(emptySet()) }
     val isSelectionMode = remember(selectedItems) { selectedItems.isNotEmpty() }
     var isMasonryMode by remember { mutableStateOf(true) }
@@ -51,6 +52,17 @@ fun VaultScreen(
         if (uris.isNotEmpty()) {
             viewModel.hideImages(context, uris) { count ->
                 showMessage = "Hidden $count images successfully"
+            }
+        }
+    }
+    
+    // Video picker launcher
+    val videoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<android.net.Uri> ->
+        if (uris.isNotEmpty()) {
+            viewModel.hideVideos(context, uris) { count ->
+                showMessage = "Hidden $count videos successfully"
             }
         }
     }
@@ -111,7 +123,7 @@ fun VaultScreen(
                             // Bulk Unhide
                             var successCount = 0
                             selectedItems.forEach { item ->
-                                viewModel.unhideImage(context, item) { success, _ -> 
+                                viewModel.unhideItem(context, item) { success, _ -> 
                                     if (success) successCount++
                                 }
                             }
@@ -170,6 +182,16 @@ fun VaultScreen(
                 ) {
                     Icon(Icons.Default.Add, "add", tint = MaterialTheme.colorScheme.onPrimary)
                 }
+            } else if (currentFolder == VaultItemType.VIDEO) {
+                 FloatingActionButton(
+                    onClick = {
+                        videoPickerLauncher.launch(arrayOf("video/*"))
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.Add, "add", tint = MaterialTheme.colorScheme.onPrimary)
+                }
             }
         },
         snackbarHost = {
@@ -194,7 +216,7 @@ fun VaultScreen(
                 VaultFolderGrid(
                     modifier = Modifier.fillMaxSize(),
                     onFolderClick = { type ->
-                        if (type == VaultItemType.IMAGE) {
+                        if (type == VaultItemType.IMAGE || type == VaultItemType.VIDEO) {
                             currentFolder = type
                         } else {
                             showMessage = "Coming Soon"
@@ -225,6 +247,23 @@ fun VaultScreen(
                         },
                         selectedItems = selectedItems,
                         isMasonryMode = isMasonryMode
+                    )
+                } else if (currentFolder == VaultItemType.VIDEO) {
+                    VaultVideoGallery(
+                        items = currentItems,
+                        onItemClick = { item ->
+                            if (isSelectionMode) {
+                                selectedItems = if (selectedItems.contains(item)) selectedItems - item else selectedItems + item
+                            } else {
+                                onItemClick(item)
+                            }
+                        },
+                        onItemLongClick = { item ->
+                             if (!isSelectionMode) {
+                                 selectedItems = selectedItems + item
+                             }
+                        },
+                        selectedItems = selectedItems
                     )
                 } else {
                     // Fallback list for other types (technically reachable only if we allow clicking other folders)

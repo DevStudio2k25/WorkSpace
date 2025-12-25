@@ -117,7 +117,26 @@ fun VaultImageViewer(
                     key = { index -> imageItems[index].id }
                 ) { page ->
                     val item = imageItems[page]
-                    val imageFile = item.thumbnailPath?.let { File(it) }
+                    // Thumbnail (always available immediately)
+                    val thumbFile = item.thumbnailPath?.let { File(it) }
+                    
+                    // High-res file state
+                    var highResFile by remember { mutableStateOf<File?>(null) }
+                    
+                    // Load high-res when page is active (or close to active)
+                    LaunchedEffect(page) {
+                        // Only load if this is the current page or adjacent?
+                        // For simplicity, load if rendered. Pager disposes off-screen items eventually.
+                        val file = viewModel.getDecryptedFile(context, item)
+                        highResFile = file
+                    }
+                    
+                    // Cleanup high-res when disposed
+                    DisposableEffect(page) {
+                        onDispose {
+                            highResFile?.delete()
+                        }
+                    }
                     
                     Box(
                         modifier = Modifier
@@ -125,9 +144,12 @@ fun VaultImageViewer(
                             .clickable { showControls = !showControls },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (imageFile != null && imageFile.exists()) {
+                        // Show High Res if available, else Thumbnail
+                        val imageModel = highResFile ?: thumbFile
+                        
+                        if (imageModel != null && imageModel.exists()) {
                             AsyncImage(
-                                model = imageFile,
+                                model = imageModel,
                                 contentDescription = item.title,
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxSize()
@@ -138,6 +160,9 @@ fun VaultImageViewer(
                                 Text("Image not found", color = Color.White)
                             }
                         }
+                        
+                        // Show loading only if we are on thumbnail and waiting for high res? 
+                        // Or just let it pop in. 
                     }
                 }
             }
@@ -175,7 +200,7 @@ fun VaultImageViewer(
                 confirmButton = {
                     TextButton(onClick = {
                         showUnhideConfirm = false
-                        viewModel.unhideImage(context, currentItem) { success, _ ->
+                        viewModel.unhideItem(context, currentItem) { success, _ ->
                             if (success && imageItems.size == 1) {
                                 onBack() // Go back if last item
                             }

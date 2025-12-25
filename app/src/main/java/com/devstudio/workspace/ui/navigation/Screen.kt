@@ -16,4 +16,7 @@ sealed class Screen(val route: String) {
     object VaultImageViewer : Screen("vault_image_viewer/{itemId}") {
         fun createRoute(itemId: Long) = "vault_image_viewer/$itemId"
     }
+    object VaultVideoPlayer : Screen("vault_video_player/{itemId}") {
+        fun createRoute(itemId: Long) = "vault_video_player/$itemId"
+    }
 }

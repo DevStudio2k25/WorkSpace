@@ -18,12 +18,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.offset
 import coil.compose.AsyncImage
 import com.devstudio.workspace.data.model.VaultItem
 import com.devstudio.workspace.data.model.VaultItemType
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.runtime.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.security.crypto.EncryptedFile
+import androidx.security.crypto.MasterKey
+import androidx.compose.ui.platform.LocalContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.Image
+import android.graphics.BitmapFactory
+import android.content.Context
+import android.graphics.Bitmap
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,34 +46,70 @@ fun FolderCard(
     label: String,
     onClick: () -> Unit
 ) {
+    // Determine colors based on type
+    val (containerColor, iconColor) = when (type) {
+        VaultItemType.IMAGE -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+        VaultItemType.VIDEO -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.error
+        VaultItemType.AUDIO -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary
+        VaultItemType.DOCUMENT -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.secondary
+        VaultItemType.NOTE -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
     Card(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1.2f),
+            .aspectRatio(1.1f), // Slightly taller
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = containerColor
         ),
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(24.dp), // More rounded
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Background Icon Decoration
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = if (type == VaultItemType.IMAGE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                modifier = Modifier
+                    .size(100.dp)
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 20.dp, y = 20.dp),
+                tint = iconColor.copy(alpha = 0.15f)
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = if (type == VaultItemType.IMAGE) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
+            
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.Start
+            ) {
+                // Top Icon
+                Surface(
+                    color = iconColor.copy(alpha = 0.1f),
+                    shape = CircleShape,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = iconColor
+                        )
+                    }
+                }
+                
+                // Label
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }
@@ -75,6 +124,21 @@ fun VaultImageItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    // State for High-Res (Decoded) Bitmap
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    
+    // Load high quality image for grid
+    LaunchedEffect(item) {
+        if (item.itemType == VaultItemType.IMAGE) {
+            // Decode to ~300-400px width which is enough for grid but better than low-res thumb
+             val bitmap = decodeEncryptedBitmap(context, item, targetWidth = 400)
+             if (bitmap != null) {
+                 imageBitmap = bitmap.asImageBitmap()
+             }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -88,7 +152,22 @@ fun VaultImageItem(
                 if (!isMasonry) it.aspectRatio(1f) else it
             }
     ) {
-        if (item.thumbnailPath != null && File(item.thumbnailPath).exists()) {
+        // Show Decoded Bitmap if available, else Thumbnail
+        if (imageBitmap != null) {
+            Image(
+                bitmap = imageBitmap!!,
+                contentDescription = item.title,
+                contentScale = if (isMasonry) ContentScale.FillWidth else ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { 
+                        if (isMasonry) it.wrapContentHeight() else it.fillMaxSize()
+                    }
+                    .let {
+                        if (isSelected) it.padding(8.dp).clip(RoundedCornerShape(8.dp)) else it
+                    }
+            )
+        } else if (item.thumbnailPath != null && File(item.thumbnailPath).exists()) {
             AsyncImage(
                 model = File(item.thumbnailPath),
                 contentDescription = item.title,
@@ -205,6 +284,7 @@ fun formatFileSize(size: Long): String {
     }
 }
 
+
 fun getGalleryHeader(timestamp: Long): String {
     val now = Calendar.getInstance()
     val time = Calendar.getInstance().apply { timeInMillis = timestamp }
@@ -220,5 +300,48 @@ fun getGalleryHeader(timestamp: Long): String {
             SimpleDateFormat("MMMM d", Locale.getDefault()).format(Date(timestamp))
             
         else -> SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(Date(timestamp))
+    }
+}
+
+suspend fun decodeEncryptedBitmap(context: Context, item: VaultItem, targetWidth: Int = 300): Bitmap? {
+    return withContext(Dispatchers.IO) {
+        try {
+            val encryptedPath = item.encryptedFilePath ?: return@withContext null
+            val file = File(encryptedPath)
+            if (!file.exists()) return@withContext null
+
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            val encryptedFile = EncryptedFile.Builder(
+                context,
+                file,
+                masterKey,
+                EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
+            ).build()
+
+            // 1. Decode bounds
+            var options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+             encryptedFile.openFileInput().use { input ->
+                BitmapFactory.decodeStream(input, null, options)
+            }
+            
+            // 2. Calculate sample size
+            var sampleSize = 1
+            if (options.outWidth > targetWidth) {
+                sampleSize = options.outWidth / targetWidth
+                if (sampleSize < 1) sampleSize = 1
+            }
+            
+            // 3. Decode actual bitmap
+            options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            encryptedFile.openFileInput().use { input ->
+                BitmapFactory.decodeStream(input, null, options)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+             null
+        }
     }
 }

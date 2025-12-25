@@ -84,10 +84,10 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                                 android.graphics.BitmapFactory.decodeStream(input, null, options)
                             }
                             
-                            // Re-open to decode with sample size
+                            // Re-open to decode with sample size (Better quality for grid)
                             context.contentResolver.openInputStream(uri)?.use { input ->
                                 val options = android.graphics.BitmapFactory.Options()
-                                options.inSampleSize = 4 // Rough downsampling to save memory
+                                options.inSampleSize = 2 // Reduced from 4 to 2 for better quality
                                 val bitmap = android.graphics.BitmapFactory.decodeStream(input, null, options)
                                 
                                 if (bitmap != null) {
@@ -96,7 +96,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                                     
                                     val thumbFile = File(thumbDir, "thumb_${System.currentTimeMillis()}.jpg")
                                     FileOutputStream(thumbFile).use { out ->
-                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, out)
+                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out) // Quality 90
                                     }
                                     thumbnailPath = thumbFile.absolutePath
                                 }
@@ -178,7 +178,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
      * Unhide an image
      * Decrypts to the public Pictures/Workspace directory
      */
-    fun unhideImage(context: Context, vaultItem: VaultItem, onComplete: (Boolean, String) -> Unit) {
+    /**
+     * Unhide an item (Image or Video)
+     * Decrypts to the public Pictures/Workspace or Movies/Workspace directory
+     */
+    fun unhideItem(context: Context, vaultItem: VaultItem, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
@@ -204,18 +208,22 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                     ).build()
                     
                     // 2. Prepare Output File in Gallery
-                     val picturesDir = File(
-                        android.os.Environment.getExternalStoragePublicDirectory(
-                            android.os.Environment.DIRECTORY_PICTURES
-                        ),
-                        "Workspace"
-                    )
-                    if (!picturesDir.exists()) {
-                        picturesDir.mkdirs()
+                    val targetDirType = if (vaultItem.itemType == VaultItemType.VIDEO) {
+                        android.os.Environment.DIRECTORY_MOVIES
+                    } else {
+                        android.os.Environment.DIRECTORY_PICTURES
                     }
                     
-                    val restoredFileName = vaultItem.originalFileName ?: "restored_${System.currentTimeMillis()}.jpg"
-                    val restoredFile = File(picturesDir, restoredFileName)
+                     val publicDir = File(
+                        android.os.Environment.getExternalStoragePublicDirectory(targetDirType),
+                        "Workspace"
+                    )
+                    if (!publicDir.exists()) {
+                        publicDir.mkdirs()
+                    }
+                    
+                    val restoredFileName = vaultItem.originalFileName ?: "restored_${System.currentTimeMillis()}"
+                    val restoredFile = File(publicDir, restoredFileName)
                     
                     // 3. Decrypt and Copy
                     encryptedFile.openFileInput().use { input ->
@@ -237,7 +245,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                             null
                         ) { _, _ -> }
 
-                        Pair(true, "Restored to Pictures/Workspace")
+                        Pair(true, "Restored to ${publicDir.name}")
                     } else {
                          Pair(false, "Decryption failed")
                     }
@@ -267,9 +275,154 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
+    /**
+     * Hide multiple videos securely
+     */
+    fun hideVideos(context: Context, uris: List<Uri>, onComplete: (Int) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            var successCount = 0
+            
+            withContext(Dispatchers.IO) {
+                // Get or create MasterKey
+                val masterKey = MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+
+                uris.forEach { uri ->
+                    try {
+                        val fileName = getFileNameFromUri(context, uri)
+                        
+                        // 1. Create Vault File
+                        val vaultDir = File(context.filesDir, "vault")
+                        if (!vaultDir.exists()) vaultDir.mkdirs()
+                        
+                        val encryptedFileName = "${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.enc"
+                        val vaultFile = File(vaultDir, encryptedFileName)
+                        
+                        // 2. Generate Video Thumbnail
+                        var thumbnailPath: String? = null
+                        try {
+                            val retriever = android.media.MediaMetadataRetriever()
+                            retriever.setDataSource(context, uri)
+                            val bitmap = retriever.getFrameAtTime() // Get first frame
+                            retriever.release()
+                            
+                            if (bitmap != null) {
+                                val thumbDir = File(context.filesDir, "thumbnails")
+                                if (!thumbDir.exists()) thumbDir.mkdirs()
+                                
+                                val thumbFile = File(thumbDir, "thumb_vid_${System.currentTimeMillis()}.jpg")
+                                FileOutputStream(thumbFile).use { out ->
+                                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, out)
+                                }
+                                thumbnailPath = thumbFile.absolutePath
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+
+                        // 3. Encrypt and Save
+                        val encryptedFile = EncryptedFile.Builder(
+                            context,
+                            vaultFile,
+                            masterKey,
+                            EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
+                        ).build()
+                        
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        if (inputStream != null) {
+                            inputStream.use { input ->
+                                encryptedFile.openFileOutput().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            
+                            // 4. Verify and Delete Original
+                            if (vaultFile.exists() && vaultFile.length() > 0) {
+                                deleteOriginalFile(context, uri)
+                                
+                                // 5. Save Metadata
+                                val vaultItem = VaultItem(
+                                    title = fileName,
+                                    content = "Secure Encrypted Video",
+                                    itemType = VaultItemType.VIDEO,
+                                    encryptedFilePath = vaultFile.absolutePath,
+                                    originalFileName = fileName,
+                                    fileSize = vaultFile.length(),
+                                    createdAt = System.currentTimeMillis(),
+                                    updatedAt = System.currentTimeMillis(),
+                                    thumbnailPath = thumbnailPath
+                                )
+                                vaultItemDao.insertVaultItem(vaultItem)
+                                successCount++
+                            } else {
+                                vaultFile.delete()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+            _isLoading.value = false
+            onComplete(successCount)
+        }
+    }
+
+    /**
+     * Get a decrypted temporary file for viewing/playing
+     * IMPORTANT: Caller must delete this file when done!
+     */
+    suspend fun getDecryptedFile(context: Context, vaultItem: VaultItem): File? = withContext(Dispatchers.IO) {
+        try {
+            val encryptedPath = vaultItem.encryptedFilePath ?: return@withContext null
+            val encryptedFileObj = File(encryptedPath)
+            if (!encryptedFileObj.exists()) return@withContext null
+
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            val encryptedFile = EncryptedFile.Builder(
+                context,
+                encryptedFileObj,
+                masterKey,
+                EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
+            ).build()
+
+            val tempFile = File.createTempFile("view_", ".tmp", context.cacheDir)
+            
+            encryptedFile.openFileInput().use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            return@withContext tempFile
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext null
+        }
+    }
+
+    private fun deleteOriginalFile(context: Context, uri: Uri) {
+        try {
+            var deleted = false
+            if (android.provider.DocumentsContract.isDocumentUri(context, uri)) {
+                try {
+                    deleted = android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri)
+                } catch (_: Exception) {}
+            }
+            if (!deleted) {
+                context.contentResolver.delete(uri, null, null)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun getFileNameFromUri(context: Context, uri: Uri): String {
-        var fileName = "image_${System.currentTimeMillis()}.jpg"
-        
+        var fileName = "file_${System.currentTimeMillis()}"
         try {
             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
@@ -281,7 +434,6 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        
         return fileName
     }
 }

@@ -212,8 +212,12 @@ fun AppNavigation(
             VaultScreen(
                 viewModel = vaultViewModel,
                 onItemClick = { item ->
-                    // Navigate to Full Screen Image Viewer
-                    navController.navigate(Screen.VaultImageViewer.createRoute(item.id))
+                    if (item.itemType == com.devstudio.workspace.data.model.VaultItemType.VIDEO) {
+                         navController.navigate(Screen.VaultVideoPlayer.createRoute(item.id))
+                    } else {
+                        // Navigate to Full Screen Image Viewer
+                        navController.navigate(Screen.VaultImageViewer.createRoute(item.id))
+                    }
                 },
                 onLockVault = {
                     navController.navigate(Screen.NotesList.route) {
@@ -238,6 +242,24 @@ fun AppNavigation(
                 initialItemId = itemId,
                 onBack = { navController.popBackStack() }
             )
+        }
+
+        // Vault Video Player
+        composable(Screen.VaultVideoPlayer.route) { backStackEntry ->
+            val itemIdString = backStackEntry.arguments?.getString("itemId")
+            val itemId = itemIdString?.toLongOrNull() ?: 0L
+            val item = vaultViewModel.vaultItems.collectAsState().value.find { it.id == itemId }
+
+            if (item != null) {
+                com.devstudio.workspace.ui.screen.vault.VaultVideoPlayer(
+                    viewModel = vaultViewModel,
+                    item = item,
+                    onBack = { navController.popBackStack() }
+                )
+            } else {
+                // Handle error
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            }
         }
         
         // Vault Item Editor (TODO: Create separate VaultItemEditor screen)
