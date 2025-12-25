@@ -211,6 +211,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                     val targetDirType = when (vaultItem.itemType) {
                         VaultItemType.VIDEO -> android.os.Environment.DIRECTORY_MOVIES
                         VaultItemType.AUDIO -> android.os.Environment.DIRECTORY_MUSIC
+                        VaultItemType.DOCUMENT -> android.os.Environment.DIRECTORY_DOWNLOADS
                         else -> android.os.Environment.DIRECTORY_PICTURES
                     }
                     
@@ -459,6 +460,78 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                                     createdAt = System.currentTimeMillis(),
                                     updatedAt = System.currentTimeMillis(),
                                     thumbnailPath = thumbnailPath
+                                )
+                                vaultItemDao.insertVaultItem(vaultItem)
+                                successCount++
+                            } else {
+                                vaultFile.delete()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+            _isLoading.value = false
+            onComplete(successCount)
+        }
+    }
+
+    /**
+     * Hide multiple documents securely
+     */
+    fun hideDocuments(context: Context, uris: List<Uri>, onComplete: (Int) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            var successCount = 0
+            
+            withContext(Dispatchers.IO) {
+                // Get or create MasterKey
+                val masterKey = MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+
+                uris.forEach { uri ->
+                    try {
+                        val fileName = getFileNameFromUri(context, uri)
+                        
+                        // 1. Create Vault File
+                        val vaultDir = File(context.filesDir, "vault")
+                        if (!vaultDir.exists()) vaultDir.mkdirs()
+                        
+                        val encryptedFileName = "${System.currentTimeMillis()}_${java.util.UUID.randomUUID()}.enc"
+                        val vaultFile = File(vaultDir, encryptedFileName)
+                        
+                        // 2. Encrypt and Save (no thumbnail for documents)
+                        val encryptedFile = EncryptedFile.Builder(
+                            context,
+                            vaultFile,
+                            masterKey,
+                            EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
+                        ).build()
+                        
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        if (inputStream != null) {
+                            inputStream.use { input ->
+                                encryptedFile.openFileOutput().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            
+                            // 3. Verify and Delete Original
+                            if (vaultFile.exists() && vaultFile.length() > 0) {
+                                deleteOriginalFile(context, uri)
+                                
+                                // 4. Save Metadata
+                                val vaultItem = VaultItem(
+                                    title = fileName,
+                                    content = "Secure Encrypted Document",
+                                    itemType = VaultItemType.DOCUMENT,
+                                    encryptedFilePath = vaultFile.absolutePath,
+                                    originalFileName = fileName,
+                                    fileSize = vaultFile.length(),
+                                    createdAt = System.currentTimeMillis(),
+                                    updatedAt = System.currentTimeMillis()
                                 )
                                 vaultItemDao.insertVaultItem(vaultItem)
                                 successCount++

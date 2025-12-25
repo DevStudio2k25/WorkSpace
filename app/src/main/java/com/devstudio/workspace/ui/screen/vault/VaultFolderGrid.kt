@@ -20,10 +20,8 @@ fun VaultFolderGrid(
     val folders = listOf(
         Triple(VaultItemType.IMAGE, Icons.Default.Image, "Images"),
         Triple(VaultItemType.VIDEO, Icons.Default.VideoLibrary, "Videos"),
-        Triple(VaultItemType.DOCUMENT, Icons.Default.Description, "Documents"),
         Triple(VaultItemType.AUDIO, Icons.Default.AudioFile, "Audio"),
-        Triple(VaultItemType.NOTE, Icons.Default.Note, "Notes"),
-        Triple(VaultItemType.OTHER, Icons.Default.Folder, "Other")
+        Triple(VaultItemType.DOCUMENT, Icons.Default.Description, "Documents")
     )
 
     LazyVerticalGrid(

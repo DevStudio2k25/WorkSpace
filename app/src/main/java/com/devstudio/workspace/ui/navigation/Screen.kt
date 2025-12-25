@@ -22,4 +22,7 @@ sealed class Screen(val route: String) {
     object VaultAudioPlayer : Screen("vault_audio_player/{itemId}") {
         fun createRoute(itemId: Long) = "vault_audio_player/$itemId"
     }
+    object VaultDocumentViewer : Screen("vault_document_viewer/{itemId}") {
+        fun createRoute(itemId: Long) = "vault_document_viewer/$itemId"
+    }
 }

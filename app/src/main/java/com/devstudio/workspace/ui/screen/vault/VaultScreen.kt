@@ -78,6 +78,17 @@ fun VaultScreen(
         }
     }
     
+    // Document picker launcher
+    val documentPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<android.net.Uri> ->
+        if (uris.isNotEmpty()) {
+            viewModel.hideDocuments(context, uris) { count ->
+                showMessage = "Hidden $count documents successfully"
+            }
+        }
+    }
+    
     // Handle Back Press
     BackHandler(enabled = currentFolder != null || isSelectionMode) {
         if (isSelectionMode) {
@@ -213,6 +224,16 @@ fun VaultScreen(
                 ) {
                     Icon(Icons.Default.Add, "add", tint = MaterialTheme.colorScheme.onPrimary)
                 }
+            } else if (currentFolder == VaultItemType.DOCUMENT) {
+                 FloatingActionButton(
+                    onClick = {
+                        documentPickerLauncher.launch(arrayOf("application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/zip", "*/*"))
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.Add, "add", tint = MaterialTheme.colorScheme.onPrimary)
+                }
             }
         },
         snackbarHost = {
@@ -237,11 +258,7 @@ fun VaultScreen(
                 VaultFolderGrid(
                     modifier = Modifier.fillMaxSize(),
                     onFolderClick = { type ->
-                        if (type == VaultItemType.IMAGE || type == VaultItemType.VIDEO || type == VaultItemType.AUDIO) {
-                            currentFolder = type
-                        } else {
-                            showMessage = "Coming Soon"
-                        }
+                        currentFolder = type
                     }
                 )
             } else {
@@ -288,6 +305,23 @@ fun VaultScreen(
                     )
                 } else if (currentFolder == VaultItemType.AUDIO) {
                     VaultAudioGallery(
+                        items = currentItems,
+                        onItemClick = { item ->
+                            if (isSelectionMode) {
+                                selectedItems = if (selectedItems.contains(item)) selectedItems - item else selectedItems + item
+                            } else {
+                                onItemClick(item)
+                            }
+                        },
+                        onItemLongClick = { item ->
+                             if (!isSelectionMode) {
+                                 selectedItems = selectedItems + item
+                             }
+                        },
+                        selectedItems = selectedItems
+                    )
+                } else if (currentFolder == VaultItemType.DOCUMENT) {
+                    VaultDocumentGallery(
                         items = currentItems,
                         onItemClick = { item ->
                             if (isSelectionMode) {

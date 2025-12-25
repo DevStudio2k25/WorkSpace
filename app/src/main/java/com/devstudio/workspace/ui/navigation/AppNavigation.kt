@@ -219,6 +219,9 @@ fun AppNavigation(
                         com.devstudio.workspace.data.model.VaultItemType.AUDIO -> {
                             navController.navigate(Screen.VaultAudioPlayer.createRoute(item.id))
                         }
+                        com.devstudio.workspace.data.model.VaultItemType.DOCUMENT -> {
+                            navController.navigate(Screen.VaultDocumentViewer.createRoute(item.id))
+                        }
                         else -> {
                             // Navigate to Full Screen Image Viewer
                             navController.navigate(Screen.VaultImageViewer.createRoute(item.id))
@@ -276,6 +279,24 @@ fun AppNavigation(
 
             if (item != null) {
                 com.devstudio.workspace.ui.screen.vault.VaultAudioPlayer(
+                    viewModel = vaultViewModel,
+                    item = item,
+                    onBack = { navController.popBackStack() }
+                )
+            } else {
+                // Handle error
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            }
+        }
+        
+        // Vault Document Viewer
+        composable(Screen.VaultDocumentViewer.route) { backStackEntry ->
+            val itemIdString = backStackEntry.arguments?.getString("itemId")
+            val itemId = itemIdString?.toLongOrNull() ?: 0L
+            val item = vaultViewModel.vaultItems.collectAsState().value.find { it.id == itemId }
+
+            if (item != null) {
+                com.devstudio.workspace.ui.screen.vault.VaultDocumentViewer(
                     viewModel = vaultViewModel,
                     item = item,
                     onBack = { navController.popBackStack() }
