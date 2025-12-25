@@ -57,6 +57,9 @@ fun AdvancedNoteEditorScreen(
                     onAiClick = { }, // No action needed, AI input always visible
                     onBack = onBack,
                     onSave = {
+                        // Clear highlights on save
+                        highlightedLines = emptyList()
+                        
                         // Save note
                         val noteToSave = currentNote?.copy(
                             title = title.ifBlank { "Untitled" },

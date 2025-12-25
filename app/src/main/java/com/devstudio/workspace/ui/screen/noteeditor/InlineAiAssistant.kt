@@ -40,7 +40,7 @@ fun InlineAiAssistant(
     onContentUpdate: (newContent: String) -> Unit,
     onTitleUpdate: (newTitle: String) -> Unit,
     onScrollToBottom: () -> Unit = {},
-    onHighlightLines: (List<Int>) -> Unit = {}, // New: highlight changed lines
+    onHighlightLines: (List<Int>) -> Unit = {}, // Highlight changed lines
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -60,20 +60,6 @@ fun InlineAiAssistant(
     var userInput by remember { mutableStateOf("") }
     var lastQuery by remember { mutableStateOf("") }
     
-    // Add line numbers to content for AI
-    fun addLineNumbers(content: String): String {
-        if (content.isBlank()) return content
-        return content.lines().mapIndexed { index, line ->
-            "[${index + 1}] $line"
-        }.joinToString("\n")
-    }
-    
-    // Remove line numbers from AI response
-    fun removeLineNumbers(content: String): String {
-        return content.lines().map { line ->
-            line.replace(Regex("^\\[\\d+\\]\\s*"), "")
-        }.joinToString("\n")
-    }
     fun shouldReplaceContent(query: String): Boolean {
         val lowerQuery = query.lowercase()
         
@@ -203,9 +189,6 @@ fun InlineAiAssistant(
         if (aiResponse != null && !aiLoading && !isTypingInEditor) {
             var processedContent = aiResponse!!.trim()
             
-            // Remove line numbers from AI response
-            processedContent = removeLineNumbers(processedContent)
-            
             var extractedTitle: String? = null
             
             // Extract title if present
@@ -219,12 +202,13 @@ fun InlineAiAssistant(
                 processedContent = lines.drop(1).joinToString("\n").trim()
             }
             
-            // Clean markdown
+            // Clean markdown (just in case AI uses it)
             processedContent = processedContent
                 .replace("**", "")
                 .replace("__", "")
                 .replace("~~", "")
                 .replace(Regex("^#+\\s", RegexOption.MULTILINE), "")
+                .replace(Regex("^[*-]\\s", RegexOption.MULTILINE), "") // Remove bullet points
             
             // Update title if extracted
             if (extractedTitle != null && (currentTitle.isBlank() || currentTitle == "Untitled")) {
@@ -235,33 +219,20 @@ fun InlineAiAssistant(
             val shouldReplace = shouldReplaceContent(lastQuery)
             
             if (currentContent.isBlank() || !shouldReplace) {
-                // Simple mode: empty content or append mode
+                // Simple mode: empty content or append mode - INSTANT UPDATE
                 isTypingInEditor = true
-                typingText = processedContent
-                typingIndex = 0
                 
-                while (typingIndex < typingText.length) {
-                    delay(5) // Fast typing speed
-                    typingIndex++
-                    
-                    val textToInsert = typingText.substring(0, typingIndex)
-                    val newContent = if (currentContent.isBlank()) {
-                        textToInsert
-                    } else {
-                        currentContent.trimEnd() + "\n\n" + textToInsert
-                    }
-                    
-                    onContentUpdate(newContent)
-                    
-                    if (typingIndex % 10 == 0) {
-                        onScrollToBottom()
-                    }
+                val newContent = if (currentContent.isBlank()) {
+                    processedContent
+                } else {
+                    currentContent.trimEnd() + "\n\n" + processedContent
                 }
                 
+                onContentUpdate(newContent)
                 onScrollToBottom()
                 isTypingInEditor = false
             } else {
-                // Myers Diff mode: smart line-by-line editing with visible unchanged content
+                // Myers Diff mode: smart line-by-line editing - INSTANT UPDATE
                 isTypingInEditor = true
                 
                 val typingSegments = getTypingSegments(currentContent, processedContent)
@@ -269,61 +240,20 @@ fun InlineAiAssistant(
                 // Track which lines are being changed
                 val changedLineIndices = mutableListOf<Int>()
                 
-                // Build initial content with all unchanged lines visible
-                val unchangedLines = mutableListOf<String>()
+                // Build final content directly
+                val finalLines = mutableListOf<String>()
                 typingSegments.forEachIndexed { index, segment ->
-                    if (segment.isUnchanged) {
-                        unchangedLines.add(segment.text)
-                    } else {
-                        unchangedLines.add("") // Placeholder for lines being typed
+                    finalLines.add(segment.text)
+                    if (!segment.isUnchanged) {
                         changedLineIndices.add(index)
                     }
                 }
                 
-                // Show initial state with unchanged content
-                onContentUpdate(unchangedLines.joinToString("\n"))
-                delay(100)
+                // Update content instantly
+                onContentUpdate(finalLines.joinToString("\n"))
                 
                 // Highlight changed lines
                 onHighlightLines(changedLineIndices)
-                
-                // Now type changed lines one by one
-                var lineIndex = 0
-                val finalLines = unchangedLines.toMutableList()
-                
-                for (segment in typingSegments) {
-                    if (segment.isUnchanged) {
-                        // Already visible, just move to next
-                        lineIndex++
-                    } else {
-                        // Type this line character by character
-                        val lineToType = segment.text
-                        var charIndex = 0
-                        
-                        while (charIndex < lineToType.length) {
-                            delay(5) // Fast typing speed
-                            charIndex++
-                            
-                            val partialLine = lineToType.substring(0, charIndex)
-                            finalLines[lineIndex] = partialLine
-                            
-                            onContentUpdate(finalLines.joinToString("\n"))
-                            
-                            if (charIndex % 10 == 0) {
-                                onScrollToBottom()
-                            }
-                        }
-                        
-                        // Complete line typed
-                        finalLines[lineIndex] = lineToType
-                        onContentUpdate(finalLines.joinToString("\n"))
-                        lineIndex++
-                    }
-                }
-                
-                // Keep highlight for 3 seconds after typing completes
-                delay(3000)
-                onHighlightLines(emptyList())
                 
                 onScrollToBottom()
                 isTypingInEditor = false
@@ -373,10 +303,12 @@ fun InlineAiAssistant(
                 FilledIconButton(
                     onClick = {
                         if (userInput.isNotBlank()) {
+                            // Clear previous highlights when new input is sent
+                            onHighlightLines(emptyList())
+                            
                             lastQuery = userInput // Store query for detection
-                            // Add line numbers to content before sending to AI
-                            val numberedContent = addLineNumbers(currentContent)
-                            viewModel.generateAiContent(userInput, numberedContent)
+                            // Send content directly to AI (no line numbers)
+                            viewModel.generateAiContent(userInput, currentContent)
                             userInput = ""
                         }
                     },
