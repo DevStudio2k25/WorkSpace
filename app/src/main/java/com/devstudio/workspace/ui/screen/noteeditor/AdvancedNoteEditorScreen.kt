@@ -25,12 +25,18 @@ fun AdvancedNoteEditorScreen(
     viewModel: NoteViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val securePrefs = remember { SecurePreferences(context) }
+    
     var currentNote by remember { mutableStateOf<Note?>(null) }
     
     // UI State
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var highlightedLines by remember { mutableStateOf<List<Int>>(emptyList()) }
+    
+    // AI enabled state from settings
+    val aiEnabled by securePrefs.aiEnabled.collectAsState(initial = false)
     
     // Coroutine scope
     val scope = rememberCoroutineScope()
@@ -56,6 +62,7 @@ fun AdvancedNoteEditorScreen(
                     onTitleChange = { title = it },
                     onAiClick = { }, // No action needed, AI input always visible
                     onBack = onBack,
+                    showAiLanguageSelector = aiEnabled, // Show only if AI enabled
                     onSave = {
                         // Clear highlights on save
                         highlightedLines = emptyList()
@@ -93,30 +100,32 @@ fun AdvancedNoteEditorScreen(
                     highlightedLines = highlightedLines
                 )
                 
-                // Inline AI Assistant (permanent at bottom)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                ) {
-                    InlineAiAssistant(
-                        isVisible = true, // Always visible
-                        onToggle = { }, // No toggle needed
-                        viewModel = viewModel,
-                        currentContent = content,
-                        currentTitle = title,
-                        onContentUpdate = { newContent ->
-                            content = newContent
-                        },
-                        onTitleUpdate = { newTitle ->
-                            title = newTitle
-                        },
-                        onScrollToBottom = {
-                            // Scroll will happen automatically in NoteContentArea
-                        },
-                        onHighlightLines = { lines ->
-                            highlightedLines = lines
-                        }
-                    )
+                // Inline AI Assistant (permanent at bottom) - Show only if AI enabled
+                if (aiEnabled) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                    ) {
+                        InlineAiAssistant(
+                            isVisible = true, // Always visible when AI enabled
+                            onToggle = { }, // No toggle needed
+                            viewModel = viewModel,
+                            currentContent = content,
+                            currentTitle = title,
+                            onContentUpdate = { newContent ->
+                                content = newContent
+                            },
+                            onTitleUpdate = { newTitle ->
+                                title = newTitle
+                            },
+                            onScrollToBottom = {
+                                // Scroll will happen automatically in NoteContentArea
+                            },
+                            onHighlightLines = { lines ->
+                                highlightedLines = lines
+                            }
+                        )
+                    }
                 }
             }
         }

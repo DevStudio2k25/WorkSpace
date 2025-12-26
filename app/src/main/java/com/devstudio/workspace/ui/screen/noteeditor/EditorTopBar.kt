@@ -20,7 +20,8 @@ fun EditorTopBar(
     onTitleChange: (String) -> Unit,
     onAiClick: () -> Unit,
     onBack: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    showAiLanguageSelector: Boolean = true // New parameter
 ) {
     val context = LocalContext.current
     val securePrefs = remember { SecurePreferences(context) }
@@ -56,48 +57,50 @@ fun EditorTopBar(
             )
         },
         actions = {
-            // Language Selector
-            Box {
-                IconButton(onClick = { showLanguageMenu = true }) {
-                    Icon(
-                        Icons.Default.Language,
-                        contentDescription = "Language",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                
-                DropdownMenu(
-                    expanded = showLanguageMenu,
-                    onDismissRequest = { showLanguageMenu = false }
-                ) {
-                    listOf("English", "Hindi", "Hinglish").forEach { lang ->
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    if (currentLanguage == lang) {
-                                        Icon(
-                                            Icons.Default.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    } else {
-                                        Spacer(modifier = Modifier.size(20.dp))
-                                    }
-                                    Text(lang)
-                                }
-                            },
-                            onClick = {
-                                scope.launch {
-                                    securePrefs.setAiLanguage(lang)
-                                    currentLanguage = lang
-                                }
-                                showLanguageMenu = false
-                            }
+            // Language Selector - Show only if AI enabled
+            if (showAiLanguageSelector) {
+                Box {
+                    IconButton(onClick = { showLanguageMenu = true }) {
+                        Icon(
+                            Icons.Default.Language,
+                            contentDescription = "Language",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showLanguageMenu,
+                        onDismissRequest = { showLanguageMenu = false }
+                    ) {
+                        listOf("English", "Hindi", "Hinglish").forEach { lang ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        if (currentLanguage == lang) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        } else {
+                                            Spacer(modifier = Modifier.size(20.dp))
+                                        }
+                                        Text(lang)
+                                    }
+                                },
+                                onClick = {
+                                    scope.launch {
+                                        securePrefs.setAiLanguage(lang)
+                                        currentLanguage = lang
+                                    }
+                                    showLanguageMenu = false
+                                }
+                            )
+                        }
                     }
                 }
             }
