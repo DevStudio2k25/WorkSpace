@@ -173,9 +173,11 @@ fun SettingsScreen(
                         Switch(
                             checked = aiEnabled,
                             onCheckedChange = { enabled ->
-                                if (enabled && (aiApiKey.isBlank() || aiModel.isBlank())) {
+                                if (enabled && aiApiKey.isBlank()) {
+                                    // If enabling and no API key, show config dialog
                                     showAiConfigDialog = true
                                 } else {
+                                    // Just toggle enable/disable, don't delete API key
                                     aiEnabled = enabled
                                     scope.launch {
                                         securePrefs.setAiEnabled(enabled)
@@ -187,17 +189,16 @@ fun SettingsScreen(
                 )
             }
             
-            if (aiEnabled || aiApiKey.isNotBlank()) {
-                item {
-                    ModernSettingCard(
-                        icon = Icons.Default.Settings,
-                        iconBackground = Color(0xFFE0F7FA), // Cyan-ish
-                        iconTint = Color(0xFF0097A7),
-                        title = "AI Configuration",
-                        subtitle = "OpenRouter API Key & Model",
-                        onClick = { showAiConfigDialog = true }
-                    )
-                }
+            // Show AI config option always (not just when enabled)
+            item {
+                ModernSettingCard(
+                    icon = Icons.Default.Settings,
+                    iconBackground = Color(0xFFE0F7FA), // Cyan-ish
+                    iconTint = Color(0xFF0097A7),
+                    title = "AI Configuration",
+                    subtitle = if (aiApiKey.isNotBlank()) "API Key configured" else "Setup API Key & Model",
+                    onClick = { showAiConfigDialog = true }
+                )
             }
             
             // About
@@ -337,7 +338,7 @@ fun SettingsScreen(
         // AI Configuration Dialog
         if (showAiConfigDialog) {
             var inputKey by remember { mutableStateOf(aiApiKey) }
-            var inputModel by remember { mutableStateOf(if (aiModel.isBlank()) "mistralai/mistral-7b-instruct:free" else aiModel) }
+            var inputModel by remember { mutableStateOf(if (aiModel.isBlank()) "google/gemma-3-27b-it:free" else aiModel) }
             var error by remember { mutableStateOf("") }
             
             AlertDialog(
@@ -346,57 +347,99 @@ fun SettingsScreen(
                     Icon(
                         Icons.Default.Face,
                         null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
                     )
                 },
                 title = { 
                     Text(
-                        "Configure AI",
-                        fontWeight = FontWeight.Bold
+                        "AI Assistant Setup",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineSmall
                     ) 
                 },
                 text = {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            "Enter your OpenRouter API Key and Model. This is required to use AI features.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        // Info card
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    "🔑 Get your free API key from:",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "openrouter.ai/keys",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                         
                         OutlinedTextField(
                             value = inputKey,
                             onValueChange = { inputKey = it },
-                            label = { Text("OpenRouter API Key") },
+                            label = { Text("API Key") },
+                            placeholder = { Text("sk-or-v1-...") },
                             singleLine = true,
                             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = {
+                                Icon(Icons.Default.Key, null, modifier = Modifier.size(20.dp))
+                            }
                         )
                         
                         OutlinedTextField(
                             value = inputModel,
                             onValueChange = { inputModel = it },
-                            label = { Text("Model Name") },
-                            placeholder = { Text("e.g. google/gemini-pro") },
+                            label = { Text("AI Model") },
+                            placeholder = { Text("google/gemma-3-27b-it:free") },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = {
+                                Icon(Icons.Default.Settings, null, modifier = Modifier.size(20.dp))
+                            },
+                            supportingText = {
+                                Text(
+                                    "Default: google/gemma-3-27b-it:free",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         )
                         
                         if (error.isNotEmpty()) {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = error,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
                         }
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = {
-                            if (inputKey.isBlank() || inputModel.isBlank()) {
-                                error = "Both fields are required."
+                            if (inputKey.isBlank()) {
+                                error = "API Key is required"
+                            } else if (inputModel.isBlank()) {
+                                error = "Model name is required"
                             } else {
                                 scope.launch {
                                     securePrefs.setAiConfig(inputKey.trim(), inputModel.trim())
@@ -407,14 +450,20 @@ fun SettingsScreen(
                                     }
                                 }
                                 showAiConfigDialog = false
+                                error = ""
                             }
                         }
                     ) {
-                        Text("Save & Enable")
+                        Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Save")
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showAiConfigDialog = false }) {
+                    TextButton(onClick = { 
+                        showAiConfigDialog = false
+                        error = ""
+                    }) {
                         Text("Cancel")
                     }
                 }

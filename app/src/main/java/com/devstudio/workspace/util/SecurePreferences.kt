@@ -157,7 +157,7 @@ class SecurePreferences(private val context: Context) {
     }
     
     val aiModel: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[AI_MODEL] ?: ""
+        prefs[AI_MODEL] ?: "google/gemma-3-27b-it:free"
     }
     
     val aiLanguage: Flow<String> = context.dataStore.data.map { prefs ->
