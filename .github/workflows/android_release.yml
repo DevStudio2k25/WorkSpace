@@ -39,16 +39,18 @@ jobs:
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       run: ./gradlew assembleRelease
 
-    - name: Generate Release Tag
-      id: tag_version
+    - name: Extract App Version from build.gradle.kts
+      id: app_version
       run: |
-        echo "tag=v1.0.${{ github.run_number }}" >> $GITHUB_OUTPUT
+        VERSION_NAME=$(grep 'versionName = ' app/build.gradle.kts | sed 's/.*versionName = "\(.*\)"/\1/')
+        echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
+        echo "App Version: $VERSION_NAME"
 
     - name: Create Release and Upload APK
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.tag_version.outputs.tag }}
-        name: Release ${{ steps.tag_version.outputs.tag }}
+        tag_name: v${{ steps.app_version.outputs.version }}
+        name: Release v${{ steps.app_version.outputs.version }}
         body_path: release_notes.md
         files: |
           app/build/outputs/apk/release/app-release.apk
